@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import { hashPassword, verifyPassword } from "./functions/otherUtils.mjs";
 dotenv.config();
 export default function authenticateToken(req, res, next) {
   const token = req.headers["authorization"]?.split(" ")[1] || "";
@@ -49,11 +50,13 @@ export function checkUser(users) {
 }
 
 export function checkPassword(users) {
-  return function (req, res, next) {
+  return async function (req, res, next) {
     const user = req.user.userName;
     const password = req.user.password;
+    const userPassword = users.get(user).password;
     // console.log("====Provided user====\t", user, "\nAvailable\t", users);
-    if (users.get(user).password !== password) {
+    const match = await verifyPassword(password, userPassword);
+    if (!match) {
       console.log("Incorrect Password");
       return res.status(400).json({
         errorMessage: "Incorrect Password",
@@ -61,6 +64,19 @@ export function checkPassword(users) {
     }
     next();
   };
+}
+
+export async function configurePassword(req, res, next) {
+  const password = req.user.password;
+  const hashedValue = await hashPassword(password);
+  if (!hashedValue) {
+    console.log("Error in registering Password");
+    return res.status(400).json({
+      errorMessage: "Error in registering Password",
+    });
+  }
+  req.user.password = hashedValue;
+  next();
 }
 
 export function checkDuplicateUser(users) {
